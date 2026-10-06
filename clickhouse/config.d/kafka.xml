@@ -1,0 +1,7 @@
+<clickhouse>
+    <!-- Читать топик с самого начала, если у consumer group ещё нет сохранённых оффсетов -->
+    <kafka>
+        <auto_offset_reset>smallest</auto_offset_reset>
+    </kafka>
+    <timezone>UTC</timezone>
+</clickhouse>

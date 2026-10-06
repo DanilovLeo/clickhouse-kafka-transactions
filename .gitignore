@@ -1,0 +1,6 @@
+# Датасет скачивается с Kaggle и в репозиторий не кладётся
+data/*
+!data/.gitkeep
+__pycache__/
+.venv/
+.DS_Store
