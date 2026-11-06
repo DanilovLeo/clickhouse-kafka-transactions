@@ -1,0 +1,181 @@
+version: 2
+
+models:
+  - name: mart_daily_state_metrics
+    description: Дневные метрики по штатам. Одна строка = дата × штат.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [transaction_date, state_code]
+    columns:
+      - name: transaction_date
+        description: Дата.
+        data_tests: [not_null]
+      - name: day_name
+        description: Название дня недели (dbt_date.day_name).
+      - name: state_code
+        description: Код штата.
+        data_tests: [not_null]
+      - name: state_name
+        description: Название штата из seed states.
+      - name: region
+        description: Регион США из seed states.
+      - name: transaction_count
+        description: Число транзакций за день в штате.
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 1
+      - name: total_amount
+        description: Сумма транзакций, $.
+      - name: avg_amount
+        description: Средний чек, $.
+      - name: p95_amount
+        description: 95-й перцентиль суммы, $.
+      - name: large_transaction_share_pct
+        description: Доля крупных транзакций (>= vars.large_amount_threshold), %.
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: fraud_count
+        description: Число мошеннических транзакций.
+
+  - name: mart_fraud_by_category
+    description: Фрод по категориям трат. Одна строка = категория, fraud_rank = 1 у самой рискованной.
+    columns:
+      - name: category
+        description: Категория трат.
+        data_tests: [not_null, unique]
+      - name: transaction_count
+        description: Всего транзакций.
+      - name: fraud_count
+        description: Мошеннических транзакций.
+      - name: fraud_rate
+        description: Доля фрода по числу транзакций, %.
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: total_amount
+        description: Оборот категории, $.
+      - name: fraud_amount
+        description: Сумма мошеннических транзакций, $.
+      - name: fraud_amount_share_pct
+        description: Доля фрода по сумме, %.
+      - name: avg_fraud_amount
+        description: Средний чек мошеннической транзакции, $.
+      - name: avg_legit_amount
+        description: Средний чек легитимной транзакции, $.
+      - name: fraud_rank
+        description: Место категории по fraud_rate (1 — самый высокий).
+        data_tests: [unique]
+    data_tests:
+      - dbt_expectations.expect_table_row_count_to_equal:
+          arguments:
+            value: 14
+      - dbt_expectations.expect_column_pair_values_A_to_be_greater_than_B:
+          arguments:
+            column_A: total_amount
+            column_B: fraud_amount
+            or_equal: true
+
+  - name: mart_fraud_by_state
+    description: Географическое распределение фрода. Одна строка = штат.
+    columns:
+      - name: state_code
+        description: Код штата.
+        data_tests: [not_null, unique]
+      - name: state_name
+        description: Название штата.
+        data_tests: [not_null]
+      - name: region
+        description: Регион США.
+      - name: transaction_count
+        description: Всего транзакций.
+      - name: fraud_count
+        description: Мошеннических транзакций.
+      - name: fraud_rate
+        description: Доля фрода, %.
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: unique_customers
+        description: Уникальных клиентов.
+      - name: customers_with_fraud
+        description: Клиентов, у которых был хотя бы один фрод.
+      - name: unique_merchants
+        description: Уникальных мерчантов.
+      - name: total_amount
+        description: Оборот, $.
+      - name: fraud_amount
+        description: Сумма фрода, $.
+      - name: fraud_rank
+        description: Место штата по fraud_rate (1 — самый высокий).
+    data_tests:
+      - dbt_expectations.expect_column_pair_values_A_to_be_greater_than_B:
+          arguments:
+            column_A: unique_customers
+            column_B: customers_with_fraud
+            or_equal: true
+
+  - name: mart_customer_risk_profile
+    description: >
+      Профиль риска клиента. Одна строка = клиент. Сегмент HIGH — доля фрода не ниже
+      vars.risk_high_fraud_rate %, MEDIUM — был хотя бы один фрод, LOW — фрода не было.
+    columns:
+      - name: customer_id
+        description: Суррогатный ключ клиента.
+        data_tests: [not_null, unique]
+      - name: first_name
+        description: Имя.
+      - name: last_name
+        description: Фамилия.
+      - name: gender
+        description: Пол.
+      - name: state_code
+        description: Штат клиента.
+      - name: city
+        description: Город клиента.
+      - name: first_transaction_at
+        description: Первая транзакция.
+      - name: last_transaction_at
+        description: Последняя транзакция.
+      - name: active_days
+        description: Число дней с транзакциями.
+      - name: transaction_count
+        description: Всего транзакций клиента.
+      - name: fraud_count
+        description: Мошеннических транзакций клиента.
+      - name: fraud_rate
+        description: Доля фрода у клиента, %.
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 100
+      - name: total_amount
+        description: Сумма всех транзакций, $.
+      - name: avg_amount
+        description: Средний чек, $.
+      - name: max_amount
+        description: Самая крупная транзакция, $.
+      - name: categories_used
+        description: Сколько разных категорий использовал клиент.
+      - name: risk_segment
+        description: Сегмент риска.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [HIGH, MEDIUM, LOW]
+    data_tests:
+      - dbt_expectations.expect_column_pair_values_A_to_be_greater_than_B:
+          arguments:
+            column_A: last_transaction_at
+            column_B: first_transaction_at
+            or_equal: true

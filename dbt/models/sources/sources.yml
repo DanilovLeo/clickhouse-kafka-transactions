@@ -1,0 +1,26 @@
+version: 2
+
+sources:
+  - name: transactions_db
+    description: Сырые транзакции из домашки по ClickHouse.
+    schema: "{{ var('source_schema', 'default') }}"
+    tables:
+      - name: transactions
+        description: Одна строка = одна карточная транзакция с признаком фрода (target).
+        columns:
+          - name: transaction_time
+            description: Время транзакции (UTC).
+            data_tests: [not_null]
+          - name: amount
+            description: Сумма транзакции в долларах.
+            data_tests: [not_null]
+          - name: us_state
+            description: Двухбуквенный код штата клиента.
+            data_tests: [not_null]
+          - name: target
+            description: Признак фрода, 1 — мошенническая транзакция.
+            data_tests:
+              - accepted_values:
+                  arguments:
+                    values: [0, 1]
+                    quote: false

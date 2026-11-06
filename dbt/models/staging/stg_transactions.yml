@@ -1,0 +1,98 @@
+version: 2
+
+models:
+  - name: stg_transactions
+    description: >
+      Очищенные транзакции. Приведены типы, нормализованы строки, удалены строки без
+      времени и с отрицательной суммой. Добавлены суррогатные ключи транзакции и клиента
+      (в источнике их нет), календарные поля, бакет суммы (макрос amount_bucket),
+      флаг крупной транзакции и расстояние клиент → мерчант.
+    data_tests:
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          arguments:
+            min_value: 1
+    columns:
+      - name: transaction_id
+        description: Суррогатный ключ транзакции (dbt_utils.generate_surrogate_key от времени, мерчанта, клиента, суммы и категории).
+        data_tests: [not_null, unique]
+      - name: customer_id
+        description: Суррогатный ключ клиента (имя, фамилия, улица, индекс).
+        data_tests: [not_null]
+      - name: transaction_time
+        description: Время транзакции, UTC.
+        data_tests: [not_null]
+      - name: transaction_date
+        description: Дата транзакции.
+        data_tests: [not_null]
+      - name: transaction_hour
+        description: Час транзакции, 0–23.
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 23
+      - name: day_of_week
+        description: День недели, 1 — понедельник, 7 — воскресенье.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6, 7]
+                quote: false
+      - name: merchant
+        description: Название мерчанта без технического префикса fraud_.
+        data_tests: [not_null]
+      - name: category
+        description: Категория трат (14 значений).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [entertainment, food_dining, gas_transport, grocery_net, grocery_pos,
+                         health_fitness, home, kids_pets, misc_net, misc_pos, personal_care,
+                         shopping_net, shopping_pos, travel]
+      - name: amount
+        description: Сумма транзакции, $.
+        data_tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+      - name: amount_bucket
+        description: Сегмент суммы из макроса amount_bucket (границы в vars.amount_buckets).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [micro, small, medium, large, xlarge]
+      - name: is_large
+        description: Сумма не меньше vars.large_amount_threshold.
+      - name: gender
+        description: Пол клиента.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [M, F]
+      - name: state_code
+        description: Двухбуквенный код штата клиента.
+        data_tests:
+          - not_null
+          - dbt_expectations.expect_column_value_lengths_to_equal:
+              arguments:
+                value: 2
+          - relationships:
+              arguments:
+                to: ref('states')
+                field: state_code
+      - name: distance_km
+        description: Расстояние между клиентом и мерчантом, км (geoDistance).
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: 0
+                max_value: 20000
+      - name: is_fraud
+        description: Признак фрода, 1 — мошенническая транзакция.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+                quote: false
