@@ -1,0 +1,42 @@
+name: fraud_dbt
+version: "1.0.0"
+config-version: 2
+
+profile: fraud_dbt
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages", "logs"]
+
+vars:
+  source_schema: default
+  amount_buckets:
+    micro: 10
+    small: 50
+    medium: 200
+    large: 1000
+  large_amount_threshold: 500
+  risk_high_fraud_rate: 5
+  "dbt_date:time_zone": "UTC"
+
+models:
+  fraud_dbt:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts
+      +engine: MergeTree()
+
+seeds:
+  fraud_dbt:
+    +schema: seeds
+    states:
+      +column_types:
+        state_code: String
+        state_name: String
+        region: LowCardinality(String)
